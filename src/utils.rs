@@ -1,7 +1,7 @@
-use std::{collections::{HashMap, VecDeque}, sync::{mpsc::{Sender, self}, Mutex, Arc}};
+use std::{collections::{HashMap, VecDeque}, sync::{mpsc::{Sender}, Mutex}, thread, time::Duration};
 
 use protobuf::Message as protoMessage;
-use raft::{Config, prelude::{Message, MessageType, Snapshot, Entry, EntryType, ConfChange}, storage::MemStorage, RawNode, StateRole};
+use raft::{Config, prelude::{Message, MessageType, Snapshot, Entry, EntryType, ConfChange, ConfChangeType}, storage::MemStorage, RawNode, StateRole};
 
 use slog::error;
 use regex::Regex;
@@ -41,7 +41,7 @@ pub fn propose(raft_group: &mut RawNode<MemStorage>, proposal: &mut Proposal) {
 
      if last_index1 == last_index2 {
         // Propose failed, don't forget to respond to the client.
-        proposal.propose_sucess.send(false).unwrap();
+        proposal.propose_success.send(false).unwrap();
      } else {
         proposal.proposed = last_index1;
      }
@@ -116,9 +116,25 @@ pub fn on_ready(
                     // the leader should response to the client, tell them if their proposals 
                     // succeeded or not
                     let proposal = proposals.lock().unwrap().pop_front().unwrap();
-                    proposal.propose_sucess.send(true).unwrap();
+                    proposal.propose_success.send(true).unwrap();
                 }
             }  
         };
 }
 
+pub fn add_all_followers(proposals: &Mutex<VecDeque<Proposal>>) {
+    for i in 2..=5u64 {
+        let mut config_change = ConfChange::default();
+        config_change.node_id = i;
+        config_change.set_change_type(ConfChangeType::AddNode);
+        loop {
+            let (proposal, rx) = Proposal::conf_change(&config_change);
+            proposals.lock().unwrap().push_back(proposal);
+            if rx.recv().unwrap() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+
+    }
+}

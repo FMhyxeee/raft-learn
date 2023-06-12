@@ -8,7 +8,7 @@ use std::{sync::{mpsc::{self, Sender, TryRecvError}, Arc, Mutex}, collections::{
 use raft::{prelude::Message, StateRole};
 use slog::Drain;
 
-use crate::{proposal::Proposal, node::Node, utils::{propose, on_ready}, signal::check_singals};
+use crate::{proposal::Proposal, node::Node, utils::{propose, on_ready, add_all_followers}, signal::check_singals};
 
 fn main() {
     let decorator = slog_term::TermDecorator::new().build();
@@ -92,6 +92,8 @@ fn main() {
         });
         handles.push(handle);
     }
+
+    add_all_followers(proposals.as_ref());
 
 
 
