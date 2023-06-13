@@ -1,14 +1,27 @@
-mod proposal;
 mod node;
-mod utils;
+mod proposal;
 mod signal;
+mod utils;
 
-use std::{sync::{mpsc::{self, Sender, TryRecvError}, Arc, Mutex}, collections::{VecDeque, HashMap}, time::{Instant, Duration}, thread};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{
+        mpsc::{self, Sender, TryRecvError},
+        Arc, Mutex,
+    },
+    thread,
+    time::{Duration, Instant},
+};
 
 use raft::{prelude::Message, StateRole};
-use slog::{Drain, info};
+use slog::{info, Drain};
 
-use crate::{proposal::Proposal, node::Node, utils::{propose, on_ready, add_all_followers}, signal::check_singals};
+use crate::{
+    node::Node,
+    proposal::Proposal,
+    signal::check_singals,
+    utils::{add_all_followers, on_ready, propose},
+};
 
 fn main() {
     let decorator = slog_term::TermDecorator::new().build();
@@ -37,7 +50,9 @@ fn main() {
     let mut handles = Vec::new();
 
     for (i, rx) in rx_vec.into_iter().enumerate() {
-        let mailboxes = (1..=5).zip(tx_vec.iter().cloned()).collect::<HashMap<u64, Sender<Message>>>();
+        let mailboxes = (1..=5)
+            .zip(tx_vec.iter().cloned())
+            .collect::<HashMap<u64, Sender<Message>>>();
         let mut node = match i {
             0 => Node::create_raft_leader(1, rx, mailboxes, &logger),
             _ => Node::create_raft_follower(rx, mailboxes),
@@ -48,7 +63,6 @@ fn main() {
 
         let rx_stop_clone = Arc::clone(&rx_stop);
         let logger = logger.clone();
-
 
         let handle = thread::spawn(move || loop {
             thread::sleep(Duration::from_millis(10));

@@ -1,6 +1,13 @@
-use std::{sync::mpsc::{Receiver, Sender}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    sync::mpsc::{Receiver, Sender},
+};
 
-use raft::{RawNode, storage::MemStorage, prelude::{Message, Snapshot}};
+use raft::{
+    prelude::{Message, Snapshot},
+    storage::MemStorage,
+    RawNode,
+};
 use slog::o;
 
 use crate::utils::{example_config, is_initial_msg};
@@ -13,7 +20,6 @@ pub struct Node {
     pub kv_pairs: HashMap<u16, String>,
 }
 
-
 impl Node {
     pub fn create_raft_leader(
         id: u64,
@@ -22,7 +28,7 @@ impl Node {
         logger: &slog::Logger,
     ) -> Self {
         let mut cfg = example_config();
-        cfg.id = id;  
+        cfg.id = id;
         let logger = logger.new(o!("tag" => format!("peer_{}", id)));
         let mut s = Snapshot::default();
         s.mut_metadata().index = 1;

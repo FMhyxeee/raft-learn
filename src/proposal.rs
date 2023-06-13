@@ -1,4 +1,4 @@
-use std::sync::mpsc::{SyncSender, self, Receiver};
+use std::sync::mpsc::{self, Receiver, SyncSender};
 
 use raft::prelude::ConfChange;
 
@@ -10,7 +10,6 @@ pub struct Proposal {
     pub proposed: u64,
     pub propose_success: SyncSender<bool>,
 }
-
 
 impl Proposal {
     pub fn conf_change(cc: &ConfChange) -> (Self, Receiver<bool>) {

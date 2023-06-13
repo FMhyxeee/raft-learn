@@ -1,9 +1,11 @@
-use std::sync::{Arc, Mutex, mpsc::{self, TryRecvError}};
+use std::sync::{
+    mpsc::{self, TryRecvError},
+    Arc, Mutex,
+};
 
 pub enum Signal {
     Terminate,
 }
-
 
 pub fn check_singals(receiver: &Arc<Mutex<mpsc::Receiver<Signal>>>) -> bool {
     match receiver.lock().unwrap().try_recv() {
@@ -12,5 +14,3 @@ pub fn check_singals(receiver: &Arc<Mutex<mpsc::Receiver<Signal>>>) -> bool {
         Err(TryRecvError::Disconnected) => true,
     }
 }
-
-

@@ -1,14 +1,21 @@
-use std::{collections::{HashMap, VecDeque}, sync::{mpsc::{Sender}, Mutex}, thread, time::Duration};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{mpsc::Sender, Mutex},
+    thread,
+    time::Duration,
+};
 
 use protobuf::Message as protoMessage;
-use raft::{Config, prelude::{Message, MessageType, Snapshot, Entry, EntryType, ConfChange, ConfChangeType}, storage::MemStorage, RawNode, StateRole};
+use raft::{
+    prelude::{ConfChange, ConfChangeType, Entry, EntryType, Message, MessageType, Snapshot},
+    storage::MemStorage,
+    Config, RawNode, StateRole,
+};
 
-use slog::error;
 use regex::Regex;
+use slog::error;
 
 use crate::proposal::Proposal;
-
-
 
 pub fn example_config() -> Config {
     Config {
@@ -25,10 +32,9 @@ pub fn is_initial_msg(msg: &Message) -> bool {
         || (msg_type == MessageType::MsgHeartbeat && msg.commit == 0)
 }
 
-
 pub fn propose(raft_group: &mut RawNode<MemStorage>, proposal: &mut Proposal) {
     let last_index1 = raft_group.raft.raft_log.last_index() + 1;
-    if let Some(( ref key,  ref value)) = proposal.normal {
+    if let Some((ref key, ref value)) = proposal.normal {
         let data = format!("put {} {}", key, value).into_bytes();
         let _ = raft_group.propose(vec![], data);
     } else if let Some(ref cc) = proposal.conf_change {
@@ -36,16 +42,15 @@ pub fn propose(raft_group: &mut RawNode<MemStorage>, proposal: &mut Proposal) {
     } else if let Some(_transferee) = proposal.transfer_leader {
         unimplemented!();
     }
-    
+
     let last_index2 = raft_group.raft.raft_log.last_index() + 1;
 
-     if last_index1 == last_index2 {
+    if last_index1 == last_index2 {
         // Propose failed, don't forget to respond to the client.
         proposal.propose_success.send(false).unwrap();
-     } else {
+    } else {
         proposal.proposed = last_index1;
-     }
-    
+    }
 }
 
 pub fn on_ready(
@@ -68,7 +73,7 @@ pub fn on_ready(
             let to = msg.to;
             if mailboxes[&to].send(msg).is_err() {
                 error!(
-                    logger, 
+                    logger,
                     "send raft message to {} fail, let Raft retry it", to
                 );
             }
@@ -90,7 +95,7 @@ pub fn on_ready(
         }
     }
 
-    let mut handle_committed_entries = 
+    let mut handle_committed_entries =
         |rn: &mut RawNode<MemStorage>, committed_entries: Vec<Entry>| {
             for entry in committed_entries {
                 if entry.data.is_empty() {
@@ -103,7 +108,7 @@ pub fn on_ready(
                     let cs = rn.apply_conf_change(&cc).unwrap();
                     store.wl().set_conf_state(cs);
                 } else {
-                    // For normal proposals, extract the key-value pair and then 
+                    // For normal proposals, extract the key-value pair and then
                     // insert them into the kv engine
 
                     let data = std::str::from_utf8(&entry.data).unwrap();
@@ -113,44 +118,43 @@ pub fn on_ready(
                     }
                 }
                 if rn.raft.state == StateRole::Leader {
-                    // the leader should response to the client, tell them if their proposals 
+                    // the leader should response to the client, tell them if their proposals
                     // succeeded or not
                     let proposal = proposals.lock().unwrap().pop_front().unwrap();
                     proposal.propose_success.send(true).unwrap();
                 }
-            }  
+            }
         };
 
-        handle_committed_entries(raft_group, ready.take_committed_entries());
+    handle_committed_entries(raft_group, ready.take_committed_entries());
 
-        if let Err(e) = store.wl().append(ready.entries()) {
-            error!(
-                logger,
-                "persist raft log fail: {:?}, need to retry or panic", e
-            );
-            return;
-        }
-
-        if let Some(hs) = ready.hs() {
-            store.wl().set_hardstate(hs.clone());
-        }
-
-        if !ready.persisted_messages().is_empty() {
-            handle_message(ready.take_persisted_messages());
-        }
-
-        let mut light_rd = raft_group.advance(ready);
-        if let Some(commit) = light_rd.commit_index() {
-            store.wl().mut_hard_state().set_commit(commit);
-        }
-
-        handle_message(light_rd.take_messages());
-
-        handle_committed_entries(raft_group, light_rd.take_committed_entries());
-
-        raft_group.advance_apply();
-
+    if let Err(e) = store.wl().append(ready.entries()) {
+        error!(
+            logger,
+            "persist raft log fail: {:?}, need to retry or panic", e
+        );
+        return;
     }
+
+    if let Some(hs) = ready.hs() {
+        store.wl().set_hardstate(hs.clone());
+    }
+
+    if !ready.persisted_messages().is_empty() {
+        handle_message(ready.take_persisted_messages());
+    }
+
+    let mut light_rd = raft_group.advance(ready);
+    if let Some(commit) = light_rd.commit_index() {
+        store.wl().mut_hard_state().set_commit(commit);
+    }
+
+    handle_message(light_rd.take_messages());
+
+    handle_committed_entries(raft_group, light_rd.take_committed_entries());
+
+    raft_group.advance_apply();
+}
 
 pub fn add_all_followers(proposals: &Mutex<VecDeque<Proposal>>) {
     for i in 2..=5u64 {
@@ -165,6 +169,5 @@ pub fn add_all_followers(proposals: &Mutex<VecDeque<Proposal>>) {
             }
             thread::sleep(Duration::from_millis(10));
         }
-
     }
 }
