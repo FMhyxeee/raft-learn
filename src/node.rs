@@ -1,4 +1,4 @@
-use std::{sync::mpsc::{Receiver, Sender}, collections::HashMap, thread, time::Duration};
+use std::{sync::mpsc::{Receiver, Sender}, collections::HashMap};
 
 use raft::{RawNode, storage::MemStorage, prelude::{Message, Snapshot}};
 use slog::o;

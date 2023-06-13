@@ -6,7 +6,7 @@ mod signal;
 use std::{sync::{mpsc::{self, Sender, TryRecvError}, Arc, Mutex}, collections::{VecDeque, HashMap}, time::{Instant, Duration}, thread};
 
 use raft::{prelude::Message, StateRole};
-use slog::Drain;
+use slog::{Drain, info};
 
 use crate::{proposal::Proposal, node::Node, utils::{propose, on_ready, add_all_followers}, signal::check_singals};
 
@@ -95,6 +95,28 @@ fn main() {
 
     add_all_followers(proposals.as_ref());
 
+    // put 100 key-value pairs
+    info!(
+        logger,
+        "We get a 5 node raft cluster, now we propose 100 proposals"
+    );
 
+    (0..100u16)
+        .filter(|i| {
+            let (proposal, rx) = Proposal::normal(*i, format!("value{}", i));
+            proposals.lock().unwrap().push_back(proposal);
+            rx.recv().unwrap()
+        })
+        .count();
 
+    info!(logger, "Propose 100 proposals success!");
+
+    // 停止集群
+    for _ in 0..NUM_NODES {
+        tx_stop.send(signal::Signal::Terminate).unwrap();
+    }
+
+    for th in handles {
+        th.join().unwrap();
+    }
 }

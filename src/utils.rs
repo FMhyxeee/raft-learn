@@ -120,7 +120,37 @@ pub fn on_ready(
                 }
             }  
         };
-}
+
+        handle_committed_entries(raft_group, ready.take_committed_entries());
+
+        if let Err(e) = store.wl().append(ready.entries()) {
+            error!(
+                logger,
+                "persist raft log fail: {:?}, need to retry or panic", e
+            );
+            return;
+        }
+
+        if let Some(hs) = ready.hs() {
+            store.wl().set_hardstate(hs.clone());
+        }
+
+        if !ready.persisted_messages().is_empty() {
+            handle_message(ready.take_persisted_messages());
+        }
+
+        let mut light_rd = raft_group.advance(ready);
+        if let Some(commit) = light_rd.commit_index() {
+            store.wl().mut_hard_state().set_commit(commit);
+        }
+
+        handle_message(light_rd.take_messages());
+
+        handle_committed_entries(raft_group, light_rd.take_committed_entries());
+
+        raft_group.advance_apply();
+
+    }
 
 pub fn add_all_followers(proposals: &Mutex<VecDeque<Proposal>>) {
     for i in 2..=5u64 {
