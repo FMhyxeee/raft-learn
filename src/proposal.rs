@@ -12,6 +12,7 @@ pub struct Proposal {
 }
 
 impl Proposal {
+    // 变更配置文件
     pub fn conf_change(cc: &ConfChange) -> (Self, Receiver<bool>) {
         let (tx, rx) = mpsc::sync_channel(1);
         let proposal = Proposal {
@@ -23,7 +24,7 @@ impl Proposal {
         };
         (proposal, rx)
     }
-
+    // 正常发送一个(key, value)对
     pub fn normal(key: u16, value: String) -> (Self, Receiver<bool>) {
         let (tx, rx) = mpsc::sync_channel(1);
         let proposal = Proposal {

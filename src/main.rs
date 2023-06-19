@@ -31,7 +31,7 @@ fn main() {
     let logger = slog::Logger::root(drain, slog::o!());
 
     // 建立一个5个node的raft集群
-    // 1. 建立交互通道
+    // 1. 建立交互通道,使用线程模拟raft node，使用mpsc::channel作为交互通道
     const NUM_NODES: usize = 5;
 
     let (mut tx_vec, mut rx_vec) = (Vec::new(), Vec::new());
@@ -41,10 +41,11 @@ fn main() {
         tx_vec.push(tx);
         rx_vec.push(rx);
     }
-
+    // 2. 建立一个停止通道，用于停止集群
     let (tx_stop, rx_stop) = mpsc::channel();
     let rx_stop = Arc::new(Mutex::new(rx_stop));
 
+    // 3. 使用VecDeque作为消息队列
     let proposals = Arc::new(Mutex::new(VecDeque::<Proposal>::new()));
 
     let mut handles = Vec::new();

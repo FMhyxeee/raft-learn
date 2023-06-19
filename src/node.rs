@@ -13,8 +13,11 @@ use slog::o;
 use crate::utils::{example_config, is_initial_msg};
 
 pub struct Node {
+    // 原始的raft node，内部使用MemStorage作为存储
     pub raft_group: Option<RawNode<MemStorage>>,
+    // 自己的消息通道
     pub my_mailbox: Receiver<Message>,
+    // 发给其他节点的消息通道
     pub mailboxes: HashMap<u64, Sender<Message>>,
     // Key-Value对，模拟状态机
     pub kv_pairs: HashMap<u16, String>,
@@ -71,7 +74,10 @@ impl Node {
     }
 
     // step a raft message, initialize the raft if need.
+    // 开始处理消息
     pub fn step(&mut self, msg: Message, logger: &slog::Logger) {
+
+        // 如果raft node没有初始化，那接受到一个消息后，进行初始化
         if self.raft_group.is_none() {
             if is_initial_msg(&msg) {
                 self.initailize_raft_from_message(&msg, logger);
